@@ -1,8 +1,8 @@
-﻿name: GhostStrap Release
+name: GhostStrap Release
 
 on:
-  push:
-    tags: ['v*']
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       tag:
@@ -33,7 +33,7 @@ jobs:
         env:
           RELEASE_REF: ${{ inputs.tag || github.ref_name }}
         run: |
-          version="$(sed -n 's:.*<AppVersion[^>]*>\([^<]*\)</AppVersion>.*:\1:p' GhostStrap/GhostStrap/GhostStrap/GhostStrap.csproj | head -n1)"
+          version="$(sed -n 's:.*<AppVersion[^>]*>\([^<]*\)</AppVersion>.*:\1:p' GhostStrap/GhostStrap/GhostStrap.csproj | head -n1)"
           tag="${RELEASE_REF#v}"
           if [[ "$tag" != "$version" ]]; then
             echo "::error::Tag $RELEASE_REF does not match project version $version"
