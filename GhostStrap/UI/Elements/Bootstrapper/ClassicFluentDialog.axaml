@@ -1,0 +1,61 @@
+<!--
+SPDX-FileCopyrightText: 2026 Froststrap
+
+SPDX-License-Identifier: MPL-2.0
+-->
+
+<base:AvaloniaDialogBase xmlns="https://github.com/avaloniaui"
+                         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                         xmlns:vm="using:Froststrap.UI.ViewModels.Bootstrapper"
+                         xmlns:base="using:Froststrap.UI.Elements.Bootstrapper.Base"
+                         xmlns:controls="using:Froststrap.UI.Elements.Controls"
+                         x:Class="Froststrap.UI.Elements.Bootstrapper.ClassicFluentDialog"
+                         x:DataType="vm:ClassicFluentDialogViewModel"
+                         Width="420" Height="190"
+                         CanResize="False"
+                         Title="Froststrap"
+                         WindowStartupLocation="CenterScreen"
+                         ExtendClientAreaToDecorationsHint="True"
+                         ExtendClientAreaTitleBarHeightHint="-1">
+
+    <Grid RowDefinitions="Auto, *, Auto">
+        <controls:TitleBar Grid.Row="0"
+                           Icon="{Binding Icon}"
+                           Title="Froststrap"
+                           ShowMinimize="False"
+                           ShowMaximize="False"
+                           ShowClose="False"/>
+
+        <Grid Grid.Row="1" Margin="16,0" VerticalAlignment="Center" ColumnDefinitions="Auto, *">
+            <Image Grid.Column="0"
+                   Width="48" Height="48"
+                   VerticalAlignment="Top"
+                   Source="{Binding Icon}"
+                   RenderOptions.BitmapInterpolationMode="HighQuality" />
+
+            <StackPanel Grid.Column="1" Margin="16,0,0,0">
+                <TextBlock FontSize="20"
+                           Text="{Binding Message}"
+                           TextWrapping="Wrap"
+                           Theme="{StaticResource BodyTextBlockStyle}" />
+
+                <ProgressBar Margin="0,16,0,0"
+                             IsIndeterminate="{Binding ProgressIndeterminate}"
+                             Maximum="{Binding ProgressMaximum}"
+                             Value="{Binding ProgressValue}" />
+            </StackPanel>
+        </Grid>
+
+        <Border Grid.Row="2" Padding="15">
+            <Border.Background>
+                <SolidColorBrush Color="{DynamicResource SolidBackgroundFillColorSecondary}"
+                                 Opacity="{Binding FooterOpacity}" />
+            </Border.Background>
+            <Button Content="{Binding CancelButtonText}"
+                    Width="120"
+                    HorizontalAlignment="Right"
+                    IsEnabled="{Binding CancelEnabled}"
+                    Command="{Binding CancelInstallCommand}" />
+        </Border>
+    </Grid>
+</base:AvaloniaDialogBase>

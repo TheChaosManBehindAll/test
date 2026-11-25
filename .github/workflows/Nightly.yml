@@ -1,0 +1,67 @@
+name: Nightly
+
+on:
+  schedule:
+    - cron: "0 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/build.yml
+    with:
+      configuration: release
+      source_ref: ${{ github.ref }}
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download platform packages
+        uses: actions/download-artifact@v7
+        with:
+          pattern: ghoststrap-release-*-${{ github.sha }}
+          merge-multiple: true
+          path: release
+
+      - name: Validate assets and create checksums
+        id: metadata
+        shell: bash
+        run: |
+          shopt -s nullglob
+          assets=(release/*)
+          if (( ${#assets[@]} == 0 )); then
+            echo "::error::No nightly build assets were downloaded"
+            exit 1
+          fi
+          find release -maxdepth 1 -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > release/SHA256SUMS
+          version="$(sed -n 's:.*<AppVersion[^>]*>\([^<]*\)</AppVersion>.*:\1:p' GhostStrap/GhostStrap.csproj | head -n1)"
+          tag="nightly-${version}-$(date -u +%Y%m%d)"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update nightly prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.metadata.outputs.tag }}
+        shell: bash
+        run: |
+          notes="Nightly build from commit ${GITHUB_SHA}. These artifacts are development builds."
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" release/* --clobber
+            gh release edit "$TAG" --title "GhostStrap $TAG" --notes "$notes" --prerelease
+          else
+            gh release create "$TAG" release/* --target "$GITHUB_SHA" --title "GhostStrap $TAG" --notes "$notes" --prerelease
+          fi

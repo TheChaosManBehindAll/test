@@ -1,0 +1,187 @@
+<!--
+SPDX-FileCopyrightText: 2026 Froststrap
+
+SPDX-License-Identifier: MPL-2.0
+-->
+
+<UserControl x:Class="Froststrap.UI.Elements.Settings.Pages.Mods.ModGeneratorPage"
+             xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:resources="using:GhostStrap.Localization"
+             xmlns:controls="using:Froststrap.UI.Elements.Controls"
+             xmlns:vm="using:Froststrap.UI.ViewModels.Settings.Mods"
+             x:DataType="vm:ModGeneratorViewModel">
+
+    <ScrollViewer VerticalScrollBarVisibility="Hidden">
+        <StackPanel Margin="14,10,14,40">
+            <controls:SectionHeader Margin="0,4,0,4" Title="{x:Static resources:Strings.Menu_ModGenerator_StylePreview}"
+                                    Description="{x:Static resources:Strings.Menu_ModGenerator_StylePreview_Description}" />
+
+            <controls:CardExpander Header="{x:Static resources:Strings.Menu_ModGenerator_IconSet_Title}"
+                                   Description="{x:Static resources:Strings.Menu_ModGenerator_IconSet_Description}"
+                                   IsExpanded="True"
+                                   Classes="NoUserExpansion">
+                <controls:CardExpander.HeaderContent>
+                    <ComboBox Width="200"
+                              ItemsSource="{Binding FontDisplayNames}"
+                              SelectedItem="{Binding SelectedFontDisplayName}" />
+                </controls:CardExpander.HeaderContent>
+
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Height="320">
+                    <ItemsControl ItemsSource="{Binding GlyphItems}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel HorizontalAlignment="Left" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Margin="4"
+                                        Padding="8"
+                                        Width="56"
+                                        Height="56"
+                                        BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="4">
+                                    <Viewbox Stretch="Uniform">
+                                        <Path Data="{Binding Data}" Fill="{Binding Brush}" Margin="0,0,10,8"/>
+                                    </Viewbox>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </controls:CardExpander>
+
+            <controls:SectionHeader Title="{x:Static resources:Strings.Menu_Appearance_Title}"
+                                    Description="{x:Static resources:Strings.Menu_ModGenerator_Appearance_Description}" />
+
+            <controls:OptionControl Header="{x:Static resources:Strings.Common_Angle}"
+                                    Description="{x:Static resources:Strings.Menu_ModGenerator_Angle_Description}">
+                <NumericUpDown Value="{Binding GradientAngle}"
+                               Width="160"
+                               Minimum="0"
+                               Maximum="360"
+                               FormatString="{}{0}°"
+                               IsEnabled="{Binding IsNotGeneratingMod}"/>
+            </controls:OptionControl>
+
+            <controls:OptionControl Header="{x:Static resources:Strings.Common_Bands}"
+                                    Description="{x:Static resources:Strings.Menu_ModGenerator_BandInfo}">
+                <NumericUpDown Value="{Binding GradientBands}"
+                               Width="160"
+                               Minimum="0"
+                               Maximum="64"
+                               PlaceholderText="8"
+                               IsEnabled="{Binding IsNotGeneratingMod}"/>
+            </controls:OptionControl>
+
+            <controls:OptionControl Header="{x:Static resources:Strings.Menu_ModGenerator_Colors_Title}"
+                                    Description="{x:Static resources:Strings.Menu_ModGenerator_Colors_Description}">
+                <Button Content="{x:Static resources:Strings.Menu_ModGenerator_AddStop}"
+                        Command="{Binding AddGradientStopCommand}"
+                        IsEnabled="{Binding IsNotGeneratingMod}"/>
+            </controls:OptionControl>
+
+            <ItemsControl ItemsSource="{Binding GradientStops}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <controls:Card Margin="0,4" Padding="16,12">
+                            <Grid ColumnDefinitions="Auto,*,45,110,Auto,Auto" VerticalAlignment="Center"
+                                  IsEnabled="{Binding $parent[ItemsControl].DataContext.IsNotGeneratingMod}">
+                                <TextBlock Text="{x:Static resources:Strings.Common_Offset}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <Slider Grid.Column="1" Minimum="0" Maximum="1"
+                                        Value="{Binding Offset, Mode=TwoWay}" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="2" Text="{Binding Offset, StringFormat={}{0:N2}}"
+                                           HorizontalAlignment="Right" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                <TextBox Grid.Column="3" Text="{Binding Color, Mode=TwoWay}"
+                                         Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                <Button Grid.Column="4" Content="{x:Static resources:Strings.Common_ColorPicker}"
+                                        Command="{Binding $parent[ItemsControl].DataContext.OpenColorPickerCommand}"
+                                        CommandParameter="{Binding}" Margin="0,0,4,0"/>
+                                <Button Grid.Column="5" Content="{x:Static resources:Strings.Common_Remove}"
+                                        Command="{Binding $parent[ItemsControl].DataContext.RemoveGradientStopCommand}"
+                                        CommandParameter="{Binding}"/>
+                            </Grid>
+                        </controls:Card>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <controls:SectionHeader Title="{x:Static resources:Strings.Menu_ModGenerator_ModsOptions}"
+                                    Description="{x:Static resources:Strings.Menu_ModGenerator_ModsOptions_Description}" />
+
+            <controls:ToggleOption Header="{x:Static resources:Strings.Menu_ModGenerator_ApplyCursor}" IsEnabled="{Binding IsNotGeneratingMod}" IsChecked="{Binding ColorCursors}" />
+
+            <controls:ToggleOption Header="{x:Static resources:Strings.Menu_ModGenerator_ApplyShiftlock}" IsEnabled="{Binding IsNotGeneratingMod}" IsChecked="{Binding ColorShiftlock}" />
+
+            <controls:ToggleOption Header="{x:Static resources:Strings.Menu_ModGenerator_ApplyEmoteWheel}" IsEnabled="{Binding IsNotGeneratingMod}" IsChecked="{Binding ColorEmoteWheel}" />
+
+            <controls:ToggleOption Header="{x:Static resources:Strings.Menu_ModGenerator_DontColorPlay}" IsEnabled="{Binding IsNotGeneratingMod}" IsChecked="{Binding DontColorPlayIcon}" />
+
+            <controls:OptionControl Header="{x:Static resources:Strings.Menu_ModGenerator_RobloxIcon}">
+                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="4" Width="320">
+                    <TextBox Text="{Binding RobloxIconImagePath}" IsReadOnly="True" PlaceholderText="No image selected"
+                             VerticalAlignment="Center" IsEnabled="{Binding IsNotGeneratingMod}"/>
+                    <Button Grid.Column="1" Content="{x:Static resources:Strings.Common_Select}" Command="{Binding SelectRobloxIconCommand}"
+                            IsEnabled="{Binding IsNotGeneratingMod}"/>
+                    <Button Grid.Column="2" Content="{x:Static resources:Strings.Common_Clear}" Command="{Binding ClearRobloxIconCommand}"
+                            IsEnabled="{Binding IsNotGeneratingMod}"/>
+                </Grid>
+            </controls:OptionControl>
+
+            <controls:OptionControl Header="{x:Static resources:Strings.Menu_ModGenerator_CustomSpinner}">
+                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="4" Width="320">
+                    <TextBox Text="{Binding CustomSpinnerPath}" IsReadOnly="True" PlaceholderText="No image selected"
+                             VerticalAlignment="Center" IsEnabled="{Binding IsNotGeneratingMod}"/>
+                    <Button Grid.Column="1" Content="{x:Static resources:Strings.Common_Select}" Command="{Binding SelectSpinnerIconCommand}"
+                            IsEnabled="{Binding IsNotGeneratingMod}"/>
+                    <Button Grid.Column="2" Content="{x:Static resources:Strings.Common_Clear}" Command="{Binding ClearSpinnerIconCommand}"
+                            IsEnabled="{Binding IsNotGeneratingMod}"/>
+                </Grid>
+            </controls:OptionControl>
+
+            <controls:ToggleOption Header="{x:Static resources:Strings.Menu_ModGenerator_IncludeModification}"
+                                    Description="{x:Static resources:Strings.Menu_ModGenerator_IncludeModification_Description}"
+                                    IsEnabled="{Binding IsNotGeneratingMod}" IsChecked="{Binding IncludeModifications}" />
+
+            <controls:OptionControl Header="{x:Static resources:Strings.Menu_ModGenerator_CustomModName}"
+                                    IsVisible="{Binding IncludeModifications}">
+                <StackPanel Width="320" Spacing="4">
+                    <TextBox Text="{Binding ModFolderName, UpdateSourceTrigger=PropertyChanged}"
+                             PlaceholderText="{Binding SuggestedFolderName}"
+                             IsEnabled="{Binding IsNotGeneratingMod}"/>
+                    <TextBlock Text="{Binding FolderNameValidationError}"
+                               FontSize="12"
+                               TextWrapping="Wrap"
+                               IsVisible="{Binding HasFolderNameValidationError}"/>
+                </StackPanel>
+            </controls:OptionControl>
+
+            <controls:IconButton Command="{Binding GenerateModCommand}"
+                                 IsEnabled="{Binding IsNotGeneratingMod}"
+                                 Content="{x:Static resources:Strings.Common_Generate}"
+                                 HorizontalAlignment="Stretch"
+                                 Height="40"
+                                 Margin="0,24,0,0"
+                                 Icon="Play"
+                                 Classes="Primary"/>
+
+            <TextBlock Text="{Binding StatusText}"
+                       IsVisible="{Binding StatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                       Margin="0,12,0,0"
+                       FontSize="12"
+                       HorizontalAlignment="Center"
+                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                       TextWrapping="Wrap" />
+
+            <ProgressBar Value="{Binding Progress}"
+                         Minimum="0"
+                         Maximum="100"
+                         Height="4"
+                         Margin="0,12,0,4"
+                         IsVisible="{Binding IsProgressVisible}"
+                         Classes="accent" />
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

@@ -1,0 +1,33 @@
+<!--
+SPDX-FileCopyrightText: 2026 Froststrap
+
+SPDX-License-Identifier: MPL-2.0
+-->
+
+<base:AvaloniaDialogBase xmlns="https://github.com/avaloniaui"
+                         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                         xmlns:base="using:Froststrap.UI.Elements.Bootstrapper.Base"
+                         xmlns:controls="using:Froststrap.UI.Elements.Controls"
+                         x:Class="Froststrap.UI.Elements.Bootstrapper.CustomDialog"
+                         Title="Froststrap"
+                         Width="800"
+                         Height="450"
+                         MinWidth="150"
+                         MinHeight="150"
+                         MaxWidth="3000"
+                         MaxHeight="3000"
+                         CanResize="False"
+                         WindowStartupLocation="CenterScreen">
+
+    <Grid RowDefinitions="Auto,*">
+        <controls:TitleBar
+            x:Name="RootTitleBar"
+            Title="Froststrap"
+            Grid.Row="0"
+            ZIndex="1001"
+            ShowClose="False"
+            ShowMaximize="False"
+            ShowMinimize="False" />
+        <Grid x:Name="ElementGrid" Grid.Row="1" />
+    </Grid>
+</base:AvaloniaDialogBase>

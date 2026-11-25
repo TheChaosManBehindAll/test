@@ -1,0 +1,181 @@
+// SPDX-FileCopyrightText: 2026 Froststrap
+//
+// SPDX-License-Identifier: MPL-2.0
+
+using System.Net.Sockets;
+using DiscordRPC;
+using DiscordRPC.IO;
+using DiscordRPC.Logging;
+using RichPresence = DiscordRPC.RichPresence;
+using DiscordRPC.Message;
+using Froststrap.Integrations.Discord;
+
+namespace Froststrap.Integrations
+{
+    internal sealed class GhostStrapRichPresence : IDisposable
+    {
+        private readonly DiscordRpcClient? _rpcClient;
+        private readonly Timestamps _startTimestamps;
+        private readonly Stopwatch _uptimeStopwatch;
+        private bool _disposed;
+        private string _currentPage = "Idle";
+        private string? _currentDialog;
+        private string _lastState = "";
+
+        public bool IsConnected => _rpcClient?.IsInitialized == true;
+
+        public GhostStrapRichPresence()
+        {
+            INamedPipeClient? pipeClient = DiscordIpcPipeClient.Create();
+            try
+            {
+                _rpcClient = new DiscordRpcClient("1399535282713399418", -1, new NullLogger(), true, pipeClient)
+                {
+                    SkipIdenticalPresence = true,
+                    ShutdownOnly = true
+                };
+                pipeClient = null;
+            }
+            finally
+            {
+                pipeClient?.Dispose();
+            }
+
+            _rpcClient.OnReady += OnReady;
+
+            _startTimestamps = new Timestamps
+            {
+                Start = DateTime.UtcNow
+            };
+
+            _uptimeStopwatch = Stopwatch.StartNew();
+
+            _ = Task.Run(() =>
+            {
+                try
+                {
+                    _rpcClient.Initialize();
+                }
+                catch (Exception ex)
+                {
+                    App.Logger.Error($"Failed to init RPC: {ex.Message}");
+                }
+            });
+        }
+
+        private void OnReady(object sender, ReadyMessage args)
+        {
+            if (_disposed) return;
+
+            App.Logger.Info($"Connected as {args.User.Username}");
+
+            if (!_disposed)
+                UpdatePresence();
+        }
+
+        public void SetPage(string pageName)
+        {
+            if (_disposed) return;
+
+            _currentPage = pageName;
+            _currentDialog = null;
+            UpdatePresence();
+        }
+
+        public void SetDialog(string dialogName)
+        {
+            if (_disposed) return;
+
+            _currentDialog = dialogName;
+            UpdatePresence();
+        }
+
+        public void ClearDialog()
+        {
+            if (_disposed) return;
+
+            _currentDialog = null;
+            UpdatePresence();
+        }
+
+        public void UpdatePresence()
+        {
+            if (_disposed || _rpcClient == null || !_rpcClient.IsInitialized)
+                return;
+
+            string state = DiscordPresenceHelper.Truncate(
+                !string.IsNullOrEmpty(_currentDialog)
+                    ? $"Page: {_currentPage} | Dialog: {_currentDialog}"
+                    : $"Page: {_currentPage}",
+                128);
+
+            if (state == _lastState)
+                return;
+
+            _lastState = state;
+
+            var presence = new RichPresence
+            {
+                Details = "Customize Roblox to your liking!",
+                State = state,
+                Timestamps = _startTimestamps,
+                Assets = new Assets
+                {
+                    LargeImageKey = "froststrap",
+                    LargeImageText = "Froststrap",
+                    SmallImageKey = "checkmark",
+                    SmallImageText = DiscordPresenceHelper.Truncate($"{App.Version}", 128)
+                },
+                Buttons =
+                [
+                    new Button { Label = "GitHub", Url = "https://github.com/GhostStrap/Froststrap" },
+                    new Button { Label = "Discord", Url = "https://discord.gg/KdR9vpRcUN" }
+                ]
+            };
+
+            try
+            {
+                _rpcClient.SetPresence(presence);
+            }
+            catch (IOException ex) when (ex.InnerException is SocketException)
+            {
+                App.Logger.Error("Socket interrupted (Operation Canceled).");
+            }
+            catch (Exception ex)
+            {
+                App.Logger.Error(ex, "Failed to update rich presence");
+            }
+        }
+
+        // i have refixed this fucking code 3 times now it BETTER not get removed
+        public void Dispose()
+        {
+            if (_disposed)
+                return;
+
+            _disposed = true;
+
+            App.Logger.Info("Cleaning up Discord RPC");
+
+            if (_rpcClient != null)
+            {
+                try
+                {
+                    _rpcClient.OnReady -= OnReady;
+                    _rpcClient.Dispose();
+                }
+                catch (IOException ex) when (ex.InnerException is SocketException)
+                {
+                    // Ignore pipe closure issues.
+                }
+                catch (Exception ex)
+                {
+                    App.Logger.Error($"Cleanup error: {ex.Message}");
+                }
+            }
+
+            _uptimeStopwatch.Stop();
+            GC.SuppressFinalize(this);
+        }
+    }
+}

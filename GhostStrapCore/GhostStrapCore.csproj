@@ -1,0 +1,27 @@
+<!--
+SPDX-FileCopyrightText: 2026 Froststrap
+
+SPDX-License-Identifier: MPL-2.0
+-->
+
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../GhostStrap/Analyzers.props" />
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Froststrap</RootNamespace>
+    <AssemblyName>GhostStrapCore</AssemblyName>
+    <IsAotCompatible>true</IsAotCompatible>
+    <NoWarn>$(NoWarn);CA1064</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="froststrap" />
+    <InternalsVisibleTo Include="GhostStrap" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../GhostStrapLocalization/GhostStrapLocalization.csproj" />
+  </ItemGroup>
+</Project>

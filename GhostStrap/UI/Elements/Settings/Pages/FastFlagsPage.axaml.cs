@@ -1,0 +1,32 @@
+// SPDX-FileCopyrightText: 2026 Froststrap
+//
+// SPDX-License-Identifier: MPL-2.0
+
+using Avalonia.Controls;
+using Froststrap.UI.ViewModels.Settings;
+
+namespace Froststrap.UI.Elements.Settings.Pages
+{
+    /// <summary>
+    /// Implementation of IDialogService for FastFlags editing
+    /// </summary>
+    internal sealed class FastFlagsDialogService(MainWindowViewModel mainVm) : IDialogService
+    {
+        private readonly MainWindowViewModel _mainVm = mainVm ?? throw new ArgumentNullException(nameof(mainVm));
+
+        public Task OpenFastFlagEditorAsync()
+        {
+            _mainVm.NavigateToFastFlagEditorCommand.Execute(null);
+            return Task.CompletedTask;
+        }
+    }
+
+    internal sealed partial class FastFlagsPage : UserControl
+    {
+        public FastFlagsPage()
+        {
+            InitializeComponent();
+            AttachedToVisualTree += (_, _) => { if (!MainWindow.IsStagingPages) App.FrostRPC?.SetPage("FastFlags Settings"); };
+        }
+    }
+}

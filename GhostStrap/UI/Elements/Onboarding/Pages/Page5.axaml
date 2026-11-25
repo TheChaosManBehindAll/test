@@ -1,0 +1,85 @@
+<!--
+SPDX-FileCopyrightText: 2026 Froststrap
+
+SPDX-License-Identifier: MPL-2.0
+-->
+
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Froststrap.UI.ViewModels.Onboarding"
+             xmlns:gv="using:Froststrap.UI.ViewModels"
+             xmlns:resources="using:GhostStrap.Localization"
+             xmlns:ic="clr-namespace:LucideAvalonia;assembly=LucideAvalonia"
+             xmlns:controls="using:Froststrap.UI.Elements.Controls"
+             x:Class="Froststrap.UI.Elements.Onboarding.Pages.Page5"
+             x:DataType="vm:Page5ViewModel">
+
+    <ScrollViewer>
+        <StackPanel Margin="14">
+            <StackPanel Orientation="Vertical" Spacing="8" HorizontalAlignment="Center" Margin="0,0,0,12">
+                <ic:Lucide x:Name="HeaderIcon"
+                           Icon="Link2"
+                           Width="70"
+                           Height="70"
+                           HorizontalAlignment="Center"
+                           StrokeBrush="{DynamicResource TextFillColorPrimaryBrush}"
+                           StrokeThickness="1.5">
+                    <ic:Lucide.Transitions>
+                        <Transitions>
+                            <DoubleTransition Property="Opacity" Duration="0:0:0.5" Easing="CubicEaseInOut" />
+                        </Transitions>
+                    </ic:Lucide.Transitions>
+                </ic:Lucide>
+                <TextBlock Text="{x:Static resources:Strings.Common_Shortcuts}"
+                           FontSize="20"
+                           FontWeight="SemiBold"
+                           HorizontalAlignment="Center"
+                           Margin="0,10,0,0" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{x:Static resources:Strings.Menu_Shortcuts_General_Description}" TextAlignment="Center" HorizontalAlignment="Center" Margin="0,0,0,8" />
+
+                <Grid x:Name="ShortcutsGrid" ColumnDefinitions="*, *">
+                    <controls:ToggleOption
+                        x:Name="DesktopOption"
+                        Grid.Column="0"
+                        Margin="0,0,4,0"
+                        Header="{x:Static resources:Strings.Common_Shortcuts_Desktop}"
+                        IsChecked="{Binding DesktopIconTask.NewState}" />
+
+                    <controls:ToggleOption
+                        x:Name="StartMenuOption"
+                        Grid.Column="1"
+                        Margin="2,0,4,0"
+                        IsVisible="{x:Static gv:GlobalViewModel.IsWindows}"
+                        Header="{x:Static resources:Strings.Common_Shortcuts_StartMenu}"
+                        IsChecked="{Binding StartMenuIconTask.NewState}" />
+                </Grid>
+
+                <Border Height="8" />
+
+                <TextBlock Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{x:Static resources:Strings.Menu_Shortcuts_Function_Description}" TextAlignment="Center" HorizontalAlignment="Center" Margin="0,0,0,8" />
+
+                <Grid ColumnDefinitions="*,*,*">
+                    <controls:ToggleOption
+                        Grid.Column="0"
+                        Margin="0,0,4,0"
+                        Header="{x:Static resources:Strings.LaunchMenu_LaunchRoblox}"
+                        IsChecked="{Binding PlayerIconTask.NewState}" />
+
+                    <controls:ToggleOption
+                        Grid.Column="1"
+                        Margin="4,0,4,0"
+                        Header="{x:Static resources:Strings.LaunchMenu_LaunchRobloxStudio}"
+                        IsChecked="{Binding StudioIconTask.NewState}" />
+
+                    <controls:ToggleOption
+                        Grid.Column="2"
+                        Margin="4,0,4,0"
+                        Header="{x:Static resources:Strings.Menu_Title}"
+                        IsChecked="{Binding SettingsIconTask.NewState}" />
+                </Grid>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

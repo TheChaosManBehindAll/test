@@ -1,0 +1,75 @@
+<!--
+SPDX-FileCopyrightText: 2026 Froststrap
+
+SPDX-License-Identifier: MPL-2.0
+-->
+
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="Analyzers.props" />
+  <Import Project="Platform.props" />
+  <Import Project="Publish.props" />
+  <Import Project="BuildMetadata.props" />
+
+  <PropertyGroup>
+    <AppVersion Condition="'$(AppVersion)' == ''">0.8.0</AppVersion>
+    <InfAppVersion Condition="'$(InfAppVersion)' == ''">$(AppVersion)</InfAppVersion>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <Version>$(AppVersion)</Version>
+    <FileVersion>$(AppVersion)</FileVersion>
+    <InformationalVersion>$(InfAppVersion)</InformationalVersion>
+    <AssemblyName>GhostStrap</AssemblyName>
+    <Company>GhostStrap</Company>
+    <Product>GhostStrap</Product>
+    <AssemblyTitle>GhostStrap</AssemblyTitle>
+    <Copyright>Copyright © GhostStrap contributors; see licensing notices</Copyright>
+    <RootNamespace>Froststrap</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <NeutralLanguage>en</NeutralLanguage>
+    <Description>A cross-platform Roblox bootstrapper.</Description>
+    <ApplicationIcon>../build/ghoststrap.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <WindowsPackageType>None</WindowsPackageType>
+  </PropertyGroup>
+
+  <!-- Resources needed by Avalonia -->
+  <ItemGroup>
+    <AvaloniaResource Include="Resources/**" />
+  </ItemGroup>
+
+  <!-- NuGet packages -->
+  <ItemGroup>
+    <PackageReference Include="AnimatedImage.Avalonia" Version="2.1.4" />
+    <PackageReference Include="Avalonia" Version="12.1.3" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.3" />
+    <PackageReference Include="Avalonia.Controls.WebView" Version="12.1.1" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.3" />
+    <PackageReference Include="Avalonia.Markup.Xaml.Loader" Version="12.1.3" Condition="'$(Configuration)' == 'Debug'" />
+    <PackageReference Include="Avalonia.Wayland" Version="12.1.3" />
+    <PackageReference Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.3">
+      <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
+      <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="DotMake.CommandLine" Version="3.7.0" />
+    <PackageReference Include="HotAvalonia" Version="3.1.5" Condition="'$(Configuration)' == 'Debug'" />
+    <PackageReference Include="Markdig" Version="1.3.2" />
+    <PackageReference Include="NLog" Version="6.2.0" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Windows.CsWin32" Version="0.3.321" PrivateAssets="all" />
+    <PackageReference Include="Velopack" Version="1.2.161" />
+    <PackageReference Include="Froststrap.DiscordRPC" Version="1.0.0" />
+    <PackageReference Include="Froststrap.LucideAvalonia" Version="2.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../FluentAvalonia/FluentAvalonia.csproj" />
+    <ProjectReference Include="../backend/backend.csproj" />
+    <ProjectReference Include="../GhostStrapLocalization/GhostStrapLocalization.csproj" />
+    <ProjectReference Include="../GhostStrapCore/GhostStrapCore.csproj" />
+  </ItemGroup>
+
+  <Import Project="Backend.targets" />
+  <Import Project="JsonContextGeneration.targets" />
+</Project>

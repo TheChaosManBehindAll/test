@@ -1,0 +1,73 @@
+<!--
+SPDX-FileCopyrightText: 2026 Froststrap
+
+SPDX-License-Identifier: MPL-2.0
+-->
+
+<base:AvaloniaWindow xmlns="https://github.com/avaloniaui"
+                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                     xmlns:base="using:Froststrap.UI.Elements.Base"
+                     xmlns:resources="using:GhostStrap.Localization"
+                     xmlns:vm="using:Froststrap.UI.ViewModels.Diagnostics"
+                     xmlns:controls="using:Froststrap.UI.Elements.Controls"
+                     x:Class="Froststrap.UI.Elements.Diagnostics.MainWindow"
+                     x:DataType="vm:MainWindowViewModel"
+                     Title="Diagnostics"
+                     WindowDecorationsTheme="{StaticResource SettingsWindowDecorationsTheme}"
+                     MinWidth="600" Width="740" Height="520"
+                     WindowStartupLocation="CenterScreen" CanResize="True">
+    <Grid RowDefinitions="Auto,*">
+        <Panel Grid.Row="0"
+               Height="{Binding TitlebarSpaceHeight}"
+               Background="Transparent"
+               PointerPressed="TitleBarGrid_PointerPressed"
+               IsVisible="{Binding IsNotLinux}" />
+        <ScrollViewer Grid.Row="1"
+                      Background="{DynamicResource ControlFillColorDefaultBrush}"
+                      VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="14,10">
+                <controls:SectionHeader
+                    Title="{x:Static resources:Strings.Menu_Diagnostics_Logs_Title}"
+                    Margin="0,4,0,4" />
+                <controls:CardAction
+                    Icon="Folder"
+                    Header="{x:Static resources:Strings.Menu_Diagnostics_FroststrapLogs_Title}"
+                    Description="{x:Static resources:Strings.Menu_Diagnostics_FroststrapLogs_Description}"
+                    Command="{Binding OpenFroststrapLogsCommand}" />
+                <controls:CardAction
+                    Icon="Folder"
+                    Header="{x:Static resources:Strings.Menu_Diagnostics_RobloxLogs_Title}"
+                    Description="{x:Static resources:Strings.Menu_Diagnostics_RobloxLogs_Description}"
+                    Command="{Binding OpenRobloxLogsCommand}" />
+
+                <controls:SectionHeader Title="{x:Static resources:Strings.Menu_Diagnostics_Clients_Title}" />
+                <controls:OptionControl
+                    Header="{x:Static resources:Strings.Common_Player}"
+                    Description="{Binding PlayerClient}" />
+                <controls:OptionControl
+                    Header="{x:Static resources:Strings.Common_Studio}"
+                    Description="{Binding StudioClient}" />
+
+                <controls:SectionHeader Title="{x:Static resources:Strings.Menu_Diagnostics_Screenshot_Title}" />
+                <controls:OptionControl
+                    Header="{x:Static resources:Strings.Menu_Diagnostics_Screenshot_Header}"
+                    Description="{x:Static resources:Strings.Menu_Diagnostics_Screenshot_Description}">
+                    <StackPanel Spacing="4" HorizontalAlignment="Right">
+                        <Button
+                            Classes="accent"
+                            HorizontalAlignment="Right"
+                            Command="{Binding TakeScreenshotCommand}"
+                            CommandParameter="{Binding $parent[Window]}"
+                            Content="{x:Static resources:Strings.Menu_Diagnostics_Screenshot_Button}" />
+                        <TextBlock
+                            HorizontalAlignment="Right"
+                            FontSize="12"
+                            IsVisible="{Binding HasScreenshotStatus}"
+                            Text="{Binding ScreenshotStatus}"
+                            Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </controls:OptionControl>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</base:AvaloniaWindow>

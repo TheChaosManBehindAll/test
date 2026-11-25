@@ -1,0 +1,105 @@
+name: GhostStrap Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to release, for example v0.8.0
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - name: Check tag matches project version
+        id: version
+        shell: bash
+        env:
+          RELEASE_REF: ${{ inputs.tag || github.ref_name }}
+        run: |
+          version="$(sed -n 's:.*<AppVersion[^>]*>\([^<]*\)</AppVersion>.*:\1:p' GhostStrap/GhostStrap.csproj | head -n1)"
+          tag="${RELEASE_REF#v}"
+          if [[ "$tag" != "$version" ]]; then
+            echo "::error::Tag $RELEASE_REF does not match project version $version"
+            exit 1
+          fi
+          echo "tag=$RELEASE_REF" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: verify
+    permissions:
+      contents: read
+    uses: ./.github/workflows/build.yml
+    with:
+      configuration: release
+      source_ref: ${{ inputs.tag || github.ref }}
+
+  publish:
+    needs: [verify, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Download platform packages
+        uses: actions/download-artifact@v7
+        with:
+          pattern: ghoststrap-release-*-${{ github.sha }}
+          merge-multiple: true
+          path: release
+
+      - name: Validate assets, create checksums, and read release notes
+        id: metadata
+        shell: bash
+        env:
+          VERSION: ${{ needs.verify.outputs.tag }}
+        run: |
+          shopt -s nullglob
+          assets=(release/*)
+          if (( ${#assets[@]} == 0 )); then
+            echo "::error::No release assets were downloaded"
+            exit 1
+          fi
+          find release -maxdepth 1 -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > release/SHA256SUMS
+          version="${VERSION#v}"
+          awk -v heading="## [$version]" '
+            index($0, heading) == 1 { found=1; next }
+            found && /^## / { exit }
+            found { print }
+          ' CHANGELOG.md > "$RUNNER_TEMP/release-notes.md"
+          if [[ ! -s "$RUNNER_TEMP/release-notes.md" ]]; then
+            echo "::error::No CHANGELOG.md section found for $version"
+            exit 1
+          fi
+          echo "prerelease=$([[ "$VERSION" == *-* ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.verify.outputs.tag }}
+          PRERELEASE: ${{ steps.metadata.outputs.prerelease }}
+        shell: bash
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" release/* --clobber
+            gh release edit "$TAG" --title "GhostStrap $TAG" --notes-file "$RUNNER_TEMP/release-notes.md" $([[ "$PRERELEASE" == true ]] && echo --prerelease)
+          else
+            gh release create "$TAG" release/* --verify-tag --title "GhostStrap $TAG" --notes-file "$RUNNER_TEMP/release-notes.md" $([[ "$PRERELEASE" == true ]] && echo --prerelease)
+          fi

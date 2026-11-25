@@ -1,0 +1,230 @@
+name: GhostStrap Build & Package
+
+on:
+  workflow_call:
+    inputs:
+      configuration:
+        type: string
+        default: debug
+      source_ref:
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+env:
+  CONFIGURATION: ${{ inputs.configuration || 'debug' }}
+  VPK_VERSION: "1.2.161"
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x64, rust-target: x86_64-pc-windows-msvc }
+          - { arch: arm64, rust-target: aarch64-pc-windows-msvc }
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+          ref: ${{ inputs.source_ref || github.ref }}
+
+      - name: Install .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          targets: ${{ matrix.rust-target }}
+
+      - name: Cache Rust build output
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: windows-${{ matrix.arch }}
+          workspaces: |
+            backend -> target
+            build -> target
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: nuget-windows-${{ matrix.arch }}-${{ hashFiles('**/*.csproj', '**/*.props', '**/*.targets') }}
+          restore-keys: nuget-windows-${{ matrix.arch }}-
+
+      - name: Install vpk
+        run: |
+          dotnet tool install vpk --version $VPK_VERSION --tool-path "$RUNNER_TEMP/vpk"
+          echo "$RUNNER_TEMP/vpk" >> "$GITHUB_PATH"
+
+      - name: Clean
+        run: cargo xtask clean
+
+      - name: Publish
+        run: cargo xtask --override-arch ${{ matrix.arch }} --configuration $CONFIGURATION publish
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: xtask-timings-windows-${{ matrix.arch }}-${{ github.sha }}
+          path: build/target/cargo-timings/*.html
+          if-no-files-found: warn
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ghoststrap-${{ inputs.configuration || 'debug' }}-win-${{ matrix.arch }}-${{ github.sha }}
+          path: .build/velopack/*
+          if-no-files-found: error
+
+  macos:
+    runs-on: macos-26
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: arm64, rust-target: aarch64-apple-darwin }
+          - { arch: x64, rust-target: x86_64-apple-darwin }
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+          ref: ${{ inputs.source_ref || github.ref }}
+
+      - name: Install .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          targets: ${{ matrix.rust-target }}
+
+      - name: Cache Rust build output
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: macos-${{ matrix.arch }}
+          workspaces: |
+            backend -> target
+            build -> target
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: nuget-macos-${{ matrix.arch }}-${{ hashFiles('**/*.csproj', '**/*.props', '**/*.targets') }}
+          restore-keys: nuget-macos-${{ matrix.arch }}-
+
+      - name: Install vpk
+        run: |
+          dotnet tool install vpk --version $VPK_VERSION --tool-path "$RUNNER_TEMP/vpk"
+          echo "$RUNNER_TEMP/vpk" >> "$GITHUB_PATH"
+
+      - name: Clean
+        run: cargo xtask clean
+
+      - name: Publish
+        env:
+          SIGN: 'false'
+        run: cargo xtask --override-arch ${{ matrix.arch }} --configuration $CONFIGURATION publish
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: xtask-timings-macos-${{ github.sha }}
+          path: build/target/cargo-timings/*.html
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ghoststrap-${{ inputs.configuration || 'debug' }}-macos-${{ matrix.arch }}-${{ github.sha }}
+          path: .build/velopack/*
+          if-no-files-found: error
+
+  linux:
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:22.04
+      # the container's default DNS has been failing to resolve archive.ubuntu.com
+      options: --dns 1.1.1.1 --dns 8.8.8.8
+    steps:
+      - name: Install system dependencies
+        run: |
+          # GitHub's Azure mirror, with retries, since archive.ubuntu.com has been unreliable
+          sed -i 's#http://\(archive\|security\).ubuntu.com#http://azure.archive.ubuntu.com#g' /etc/apt/sources.list
+          printf 'Acquire::Retries "5";\nAcquire::http::Timeout "30";\n' > /etc/apt/apt.conf.d/80-retries
+          apt-get update
+          apt-get install -y \
+            git \
+            curl \
+            ca-certificates \
+            clang \
+            squashfs-tools \
+            build-essential \
+            zlib1g-dev \
+            libdbus-1-dev \
+            pkg-config
+
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+          ref: ${{ inputs.source_ref || github.ref }}
+
+      - name: Install .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          targets: x86_64-unknown-linux-gnu
+
+      - name: Cache Rust build output
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: linux-x64
+          workspaces: |
+            backend -> target
+            build -> target
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: nuget-linux-x64-${{ hashFiles('**/*.csproj', '**/*.props', '**/*.targets') }}
+          restore-keys: nuget-linux-x64-
+
+      - name: Install vpk
+        run: |
+          dotnet tool install vpk --version $VPK_VERSION --tool-path "$RUNNER_TEMP/vpk"
+          echo "$RUNNER_TEMP/vpk" >> "$GITHUB_PATH"
+
+      - name: Clean
+        run: cargo xtask clean
+
+      - name: Publish
+        run: cargo xtask --configuration $CONFIGURATION publish
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: xtask-timings-linux-${{ github.sha }}
+          path: build/target/cargo-timings/*.html
+          if-no-files-found: warn
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ghoststrap-${{ inputs.configuration || 'debug' }}-linux-x64-${{ github.sha }}
+          path: |
+            .build/velopack/*
+            .build/dist/*.deb
+            .build/dist/*.rpm
+            .build/dist/*.tar.zst
+          if-no-files-found: error

@@ -1,0 +1,688 @@
+// SPDX-FileCopyrightText: 2026 Froststrap
+//
+// SPDX-License-Identifier: MPL-2.0
+
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Markup.Xaml;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform;
+using Avalonia.Styling;
+using Avalonia.Threading;
+using Froststrap.AppData;
+using Froststrap.Clients;
+using Froststrap.Clients.Model;
+using Froststrap.Clients.Registry;
+using Froststrap.Clients.Runtime;
+using Froststrap.Integrations;
+using Froststrap.UI.Elements.Base;
+using Froststrap.UI.Utility;
+using Microsoft.Win32;
+using System.Reflection;
+using System.Runtime.InteropServices;
+using Velopack;
+
+namespace Froststrap;
+
+internal sealed partial class App : Application
+{
+    public static bool AboutOpen;
+    private void About_OnClick(object? sender, EventArgs e)
+    {
+        if (AboutOpen) return;
+
+        new Froststrap.UI.Elements.About.MainWindow().Show();
+        AboutOpen = true;
+    }
+
+    public static bool SettingsOpen;
+    private void Settings_OnClick(object? sender, EventArgs e)
+    {
+        if (SettingsOpen) return;
+
+        LaunchHandler.LaunchSettings();
+    }
+
+    public static bool DiagnosticsOpen;
+    private void Diagnostics_OnClick(object? sender, EventArgs e)
+    {
+        if (DiagnosticsOpen) return;
+
+        new Froststrap.UI.Elements.Diagnostics.MainWindow().Show();
+        DiagnosticsOpen = true;
+    }
+
+    public static LaunchSettings LaunchSettings { get; internal set; } = null!;
+
+    public static readonly BuildMetadataAttribute BuildMetadata = Assembly.GetExecutingAssembly()
+        .GetCustomAttribute<BuildMetadataAttribute>()!;
+
+    public static readonly string Version = (Assembly.GetExecutingAssembly()
+        .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+        ?? "unknown+asteo").Split("+")[0];
+
+    public static readonly string InternalVersion = Assembly.GetExecutingAssembly()
+        .GetName().Version!.ToString()[..^2];
+
+    public static Bootstrapper? Bootstrapper { get; set; } = null!;
+
+    public GhostStrapRichPresence? RichPresence { get; private set; }
+
+    public static bool IsPlayerInstalled => Clients.Player.IsInstalled();
+
+    public static bool IsStudioInstalled => Clients.Studio.IsInstalled();
+
+    private static ClientRegistry? _clients;
+
+    public static ClientRegistry Clients => _clients ?? throw new InvalidOperationException("Clients are resolved after Paths.Initialize()");
+
+    public static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
+
+    public static readonly Dictionary<string, BaseTask> PendingSettingTasks = [];
+
+    // Disambiguate Settings so we use the persistable Settings (Bloxstrap.Models.Persistable.Settings),
+    // not the auto-generated Properties.Settings which doesn't contain the clicker fields.
+    public static readonly JsonManager<Settings> Settings = new();
+
+    public static readonly JsonManager<State> State = new();
+
+    public static readonly LazyJsonManager<DistributionState> PlayerState = new(nameof(PlayerState));
+
+    public static readonly LazyJsonManager<DistributionState> StudioState = new(nameof(StudioState));
+
+    public static readonly RemoteDataManager RemoteData = new();
+
+    public static readonly FastFlagManager FastFlags = new();
+
+    public static readonly GBSEditor GlobalSettings = new();
+
+    public static readonly CookiesManager Cookies = new();
+
+    public static readonly HttpClient HttpClient = new(new HttpClientLoggingHandler(new HttpClientHandler { AutomaticDecompression = DecompressionMethods.All }));
+
+    public static void SavePendingUpdateNotes(UpdateInfo update)
+    {
+        string notes = update.TargetFullRelease.NotesMarkdown ?? string.Empty;
+        State.Prop.PendingUpdateVersion = notes.Length == 0 ? null : update.TargetFullRelease.Version.ToString();
+        State.Prop.PendingUpdateReleaseNotes = notes.Length == 0 ? null : notes;
+        State.Save();
+    }
+
+    private static async Task ShowPendingUpdateNotesAsync()
+    {
+        string? version = State.Prop.PendingUpdateVersion;
+        string? notes = State.Prop.PendingUpdateReleaseNotes;
+
+        if (version is null || string.IsNullOrWhiteSpace(notes))
+            return;
+
+        if (LaunchSettings.RobloxLaunchMode != LaunchMode.None || !string.Equals(version, Version, StringComparison.OrdinalIgnoreCase))
+        {
+            State.Prop.PendingUpdateVersion = null;
+            State.Prop.PendingUpdateReleaseNotes = null;
+            State.Save();
+            return;
+        }
+
+        State.Prop.PendingUpdateVersion = null;
+        State.Prop.PendingUpdateReleaseNotes = null;
+        State.Save();
+
+        await Frontend.ShowReleaseNotesDialog(
+            string.Format(CultureInfo.CurrentCulture, Strings.Menu_Deployment_ReleaseNotes_Title, version),
+            notes);
+    }
+
+    private static bool _showingExceptionDialog;
+    private static readonly Lock ActivationLock = new();
+    private static readonly ManualResetEventSlim ActivationReceived = new(false);
+    private static readonly TimeSpan ColdStartActivationTimeout = TimeSpan.FromMilliseconds(250);
+    private static string? _pendingActivationUri;
+    private static bool _launchArgsProcessed;
+    private static DateTime _waitStart;
+    private static List<Style>? _disableAnimationStyles;
+
+    private static string? GetEnvironmentVariable(params string[] names)
+    {
+        foreach (string name in names)
+        {
+            string? value = Environment.GetEnvironmentVariable(name);
+
+            if (!string.IsNullOrWhiteSpace(value))
+                return value;
+        }
+
+        return null;
+    }
+
+    private async void OnUnhandledException(object? sender, UnhandledExceptionEventArgs e)
+    {
+        if (e.ExceptionObject is Exception ex) await FinalizeExceptionHandling(ex);
+    }
+
+    private void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
+    {
+        e.SetObserved();
+
+        if (e.Exception.Flatten().InnerExceptions.All(IsExpectedCancellationException))
+            return;
+
+        Logger.Error(
+            e.Exception,
+            "An unobserved background task exception occurred."
+        );
+    }
+
+    private static bool IsExpectedCancellationException(Exception exception)
+        => exception is OperationCanceledException
+            || exception is IOException
+                && exception.InnerException is System.Net.Sockets.SocketException { ErrorCode: 125 };
+
+    public static void Terminate(ErrorCode exitCode = ErrorCode.ERROR_SUCCESS)
+    {
+        int exitCodeNum = (int)exitCode;
+
+        Logger.Debug($"Terminating with exit code {exitCodeNum} ({exitCode})");
+
+#if __APPLE__
+        Froststrap.Backend.VirtualDisplay.End();
+#endif
+        Environment.Exit(exitCodeNum);
+    }
+
+    async void GlobalExceptionHandler(object? sender, DispatcherUnhandledExceptionEventArgs e)
+    {
+        e.Handled = true;
+
+        if (IsWebViewInitializationAbort(e.Exception))
+        {
+            Logger.Info("Ignored WebView2 initialization abort.");
+            return;
+        }
+
+        Logger.Error($"An exception occurred: {e.Exception.Message}");
+
+        await FinalizeExceptionHandling(e.Exception);
+    }
+
+    private static bool IsWebViewInitializationAbort(Exception ex)
+    {
+        for (Exception? current = ex; current != null; current = current.InnerException)
+        {
+            if (current is COMException { HResult: unchecked((int)0x80004004) })
+                return true;
+        }
+
+        return false;
+    }
+
+    public static async Task FinalizeExceptionHandling(AggregateException ex)
+    {
+        foreach (var innerEx in ex.InnerExceptions)
+            Logger.Error(innerEx, "Unhandled exception (inner)");
+
+        await FinalizeExceptionHandling(ex.GetBaseException(), false);
+    }
+
+    public static async Task FinalizeExceptionHandling(Exception ex, bool log = true)
+    {
+        if (log) Logger.Error(ex, "Unhandled exception");
+
+        // IOException wrapping SocketException(125 = ECANCELED). This is normal shutdown, not an error.
+        if (ex is IOException && ex.InnerException is System.Net.Sockets.SocketException se && se.ErrorCode == 125)
+        {
+            Logger.Error("Ignoring expected cancellation IOException on shutdown (ECANCELED).");
+            return;
+        }
+
+        // Also swallow bare OperationCanceledException — these are always intentional cancellations.
+        if (ex is OperationCanceledException)
+        {
+            Logger.Error("Ignoring OperationCanceledException on shutdown.");
+            return;
+        }
+
+        if (_showingExceptionDialog)
+            return;
+
+        _showingExceptionDialog = true;
+
+        if (Bootstrapper?.Dialog != null)
+        {
+            if (Bootstrapper.Dialog.TaskbarProgressValue == 0)
+                Bootstrapper.Dialog.TaskbarProgressValue = 1; // make sure it's visible
+
+            Bootstrapper.Dialog.TaskbarProgressState = TaskbarItemProgressState.Error;
+        }
+
+        if (IsNetworkException(ex))
+        {
+            await Frontend.ShowConnectivityDialog(
+                Strings.Dialog_Connectivity_UnableToConnect,
+                "Network Error",
+                MessageBoxImage.Warning,
+                ex
+            );
+
+            using var checkLock = new InterProcessLock("Bootstrapper", TimeSpan.Zero);
+            if (!checkLock.IsAcquired)
+            {
+                Logger.Error("Bootstrapper is running, closing.");
+                Terminate(ErrorCode.ERROR_INSTALL_FAILURE);
+            }
+        }
+        else
+        {
+            await Frontend.ShowExceptionDialog(ex);
+            Terminate(ErrorCode.ERROR_INSTALL_FAILURE);
+        }
+    }
+
+    private static bool IsNetworkException(Exception? ex)
+    {
+        while (ex is not null)
+        {
+            if (ex is HttpRequestException ||
+                ex is System.Net.Sockets.SocketException ||
+                ex is WebException ||
+                ex is TaskCanceledException)
+            {
+                return true;
+            }
+            ex = ex.InnerException;
+        }
+        return false;
+    }
+
+    public static Task AssertWindowsAUMIDAsync()
+    {
+#if DEBUG
+        /// Return early just because of if this runs in debug this might fuck shit up
+        /// Would be good to though make it more robust so this doesn't need to happen
+        return Task.CompletedTask;
+#else
+        return AssertWindowsAUMIDImplAsync();
+#endif
+    }
+
+    private static async Task AssertWindowsAUMIDImplAsync()
+    {
+        if (!OperatingSystem.IsWindows())
+            return;
+
+        Logger.Debug("Verifying AUMID creation");
+
+        string iconPath = Path.Combine(AppContext.BaseDirectory, "AppIcon.ico");
+
+        const string aumidKeyPath = $@"Software\Classes\AppUserModelId\{ProjectInfo.BundleId}";
+        using var baseKey = Registry.CurrentUser;
+
+        if (
+            baseKey.GetSubKeyNames().Contains("AppUserModelId")
+            && baseKey.OpenSubKey("AppUserModelId")?.GetSubKeyNames().Contains(ProjectInfo.BundleId) == true
+        )
+        {
+            using var aumidKeys = baseKey.OpenSubKey(aumidKeyPath, writable: true);
+            if (aumidKeys is null)
+            {
+                Logger.Warn("Could not open existing AUMID key for writing.");
+                return;
+            }
+
+            string? currentIconUri = aumidKeys.GetValue("IconUri") as string;
+            if (currentIconUri == null || !string.Equals(currentIconUri, iconPath, StringComparison.OrdinalIgnoreCase))
+            {
+                aumidKeys.SetValue("IconUri", iconPath);
+                Logger.Info($"Updated IconUri from '{currentIconUri}' to '{iconPath}'.");
+            }
+            return;
+        }
+
+        using var aumidKey = baseKey.CreateSubKey(aumidKeyPath);
+        aumidKey.SetValue("DisplayName", "GhostStrap");
+        aumidKey.SetValue("IconBackgroundColor", "FFDDDDDD");
+        aumidKey.SetValue("IconUri", iconPath);
+        Logger.Info("Created AUMID registry key.");
+    }
+
+    private static void OnSystemColorValuesChanged(object? sender, PlatformColorValues e)
+    {
+        if (Settings.Prop.Theme != Theme.Default)
+            return;
+
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (Settings.Prop.Theme == Theme.Default)
+                AvaloniaWindow.ApplyTheme();
+        });
+    }
+
+    public static void LoadRemoteTranslations()
+    {
+        string cacheDirectory = Path.Combine(Paths.Cache, "Translations");
+
+        try
+        {
+            int cached = RemoteTranslations.LoadCached(cacheDirectory);
+            if (cached > 0)
+                Logger.Debug($"Loaded {cached} cached remote translations for {Localizer.CultureName}");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        {
+            Logger.Warn(ex, "Failed to load cached remote translations");
+        }
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                int updated = await RemoteTranslations.RefreshAsync(HttpClient, cacheDirectory);
+                if (updated > 0)
+                    Logger.Info($"Updated {updated} remote translations for {Localizer.CultureName}");
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn(ex, "Failed to refresh remote translations");
+            }
+        });
+    }
+
+    public static void ApplyAnimationSettings()
+    {
+        var app = Application.Current;
+        if (app == null)
+            return;
+
+        RemoveAnimationSettings();
+
+        _disableAnimationStyles = [];
+
+        var styleTransitions = new Style(x => x.OfType<Control>());
+        styleTransitions.Setters.Add(new Setter(Control.TransitionsProperty, null));
+        _disableAnimationStyles.Add(styleTransitions);
+        app.Styles.Add(styleTransitions);
+
+        app.Resources["FadeDuration"] = TimeSpan.Zero;
+        app.Resources["SlideDuration"] = TimeSpan.Zero;
+
+        Logger.Debug("Animations disabled globally.");
+    }
+
+    public static void RemoveAnimationSettings()
+    {
+        var app = Application.Current;
+        if (app == null) return;
+
+        if (_disableAnimationStyles != null)
+        {
+            foreach (var style in _disableAnimationStyles)
+                app.Styles.Remove(style);
+            _disableAnimationStyles = null;
+        }
+
+        app.Resources.Remove("FadeDuration");
+        app.Resources.Remove("SlideDuration");
+
+        Logger.Debug("Animations re‑enabled.");
+    }
+
+    public override void Initialize()
+    {
+        AvaloniaXamlLoader.Load(this);
+
+        Resources["ContentControlThemeFontFamily"] = new Avalonia.Media.FontFamily("fonts:Inter#Inter");
+        Resources["ComboBoxPadding"] = new Thickness(12, 7, 0, 5);
+        Resources["ComboBoxItemThemePadding"] = new Thickness(11, 7, 11, 5);
+        Resources["ComboBoxEditableTextPadding"] = new Thickness(11, 7, 32, 4);
+        Resources["TextControlThemePadding"] = new Thickness(10, 7, 6, 4);
+        Resources["ButtonPadding"] = new Thickness(11, 5, 11, 5);
+        Resources["MenuFlyoutItemThemePadding"] = new Thickness(11, 10, 11, 7);
+
+        AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
+        TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
+        Dispatcher.UIThread.UnhandledException += GlobalExceptionHandler;
+
+        if (OperatingSystem.IsMacOS() && TryGetFeature(typeof(IActivatableLifetime)) is IActivatableLifetime activatableLifetime)
+            activatableLifetime.Activated += OnAppActivated;
+
+        MacOSDock.Initialize();
+    }
+
+    private static void OnAppActivated(object? sender, ActivatedEventArgs e)
+    {
+        if (!OperatingSystem.IsMacOS())
+            return;
+
+        if (e is not ProtocolActivatedEventArgs { Kind: ActivationKind.OpenUri } protocolArgs)
+            return;
+
+        string uri = protocolArgs.Uri.OriginalString;
+
+        ActivationReceived.Set();
+
+        lock (ActivationLock)
+        {
+            if (!_launchArgsProcessed)
+            {
+                if (LaunchSettings is not null && LaunchSettings.RobloxLaunchMode == LaunchMode.None)
+                    LaunchSettings.TryResolveRobloxUri([uri]);
+                else if (LaunchSettings is null)
+                    _pendingActivationUri = uri;
+
+                return;
+            }
+        }
+
+        Logger.Info($"Received activation URI: {uri}");
+        LaunchHandler.HandleActivationUri(uri);
+    }
+
+    public static GhostStrapRichPresence? FrostRPC
+    {
+        get => (Current as App)?.RichPresence;
+        set
+        {
+            if (Current is not App app)
+                return;
+
+            if (ReferenceEquals(app.RichPresence, value))
+                return;
+
+            app.RichPresence?.Dispose();
+            app.RichPresence = value;
+        }
+    }
+
+    public override async void OnFrameworkInitializationCompleted()
+    {
+        if (ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop)
+            return;
+
+#if __APPLE__
+        Logger.Debug("Forcing Mobile App URI to be handled by us");
+        Backend.MobileAppReg.Init();
+#endif
+
+        desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
+        desktop.Exit += (_, _) =>
+        {
+            FrostRPC = null;
+        };
+
+#if __APPLE__
+        desktop.ShutdownRequested += (_, _) =>
+        {
+            Froststrap.Backend.VirtualDisplay.End();
+        };
+#endif
+
+        Paths.Initialize();
+
+        // must happen before anything below loads Settings/State from the new data root
+        if (OperatingSystem.IsWindows())
+            Migrations.MigrateOutOfInstallRoot();
+
+        NLog.GlobalDiagnosticsContext.Set("logRoot", Paths.Logs);
+        NLog.GlobalDiagnosticsContext.Set("startTime", DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss", CultureInfo.InvariantCulture));
+
+        Logger.Debug($"Starting {ProjectInfo.Name} {Version} ({Paths.Process})");
+        Logger.Debug($"OS Description: {RuntimeInformation.OSDescription}");
+        Logger.Debug($"Compiled for RID: {RuntimeInformation.RuntimeIdentifier}");
+        Logger.Debug($"Compiled {BuildMetadata.LocalTimestamp.ToFriendlyString()}");
+
+        _clients = ClientCatalog.Build(ClientEnvironment.FromHost());
+
+        foreach (ClientTarget target in Enum.GetValues<ClientTarget>())
+        {
+            ClientResolution resolution = _clients.Describe(target);
+            Logger.Info($"Client for {target}: {resolution.ClientId} ({resolution.DisplayName}) on {resolution.Host}");
+        }
+
+        var userAgent = new StringBuilder($"{ProjectInfo.Name}/{Version}");
+
+        HttpClient.Timeout = TimeSpan.FromSeconds(60);
+        if (HttpClient.DefaultRequestHeaders.UserAgent.Count == 0)
+            HttpClient.DefaultRequestHeaders.Add("User-Agent", userAgent.ToString());
+
+        lock (ActivationLock)
+        {
+            if (LaunchSettings.RobloxLaunchMode == LaunchMode.None && _pendingActivationUri is not null)
+                LaunchSettings.TryResolveRobloxUri([_pendingActivationUri]);
+        }
+
+        _ = Task.Run(RemoteData.LoadData);
+
+        Settings.Load();
+        State.Load();
+
+        if (Settings.Prop.Theme == Theme.Custom && Settings.Prop.BackgroundType == BackgroundMode.Image)
+        {
+            Settings.Prop.Theme = Theme.Image;
+            Settings.Save();
+        }
+
+        string locale = Locale.Normalise(Settings.Prop.Locale);
+        if (locale != Settings.Prop.Locale)
+        {
+            Logger.Info($"Migrating locale setting '{Settings.Prop.Locale}' to '{locale}'");
+            Settings.Prop.Locale = locale;
+            Settings.Save();
+        }
+
+        AvaloniaWindow.ApplyTheme();
+
+        if (PlatformSettings is { } platformSettings)
+            platformSettings.ColorValuesChanged += OnSystemColorValuesChanged;
+
+        Locale.Set(locale);
+        LoadRemoteTranslations();
+
+        if (Settings.Prop.DisableAnimations)
+            ApplyAnimationSettings();
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                UriHandler.EnsureRegistered();
+                _ = Integrations.AccountManager.AccountManager.Shared;
+
+                FastFlags.Load();
+                GlobalSettings.Load();
+
+                Clients.Player.SettingsSync?.Load();
+
+                _ = AssertWindowsAUMIDAsync();
+
+                await Migrations.RunMigrations();
+
+                if (Settings.Prop.AllowCookieAccess)
+                    await Cookies.LoadCookies();
+
+                if (OperatingSystem.IsLinux())
+                    LinuxRegistry.RegisterAll();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Background initialisation failed");
+            }
+        });
+
+        _ = Task.Run(async () =>
+        {
+            if (
+                Settings.Prop.UpdateChecks == UpdateCheck.Disabled
+                || UpdaterManager.IsCiBuild
+                || LaunchSettings.BypassUpdateCheck
+            ) return;
+
+            try
+            {
+                bool includePrerelease = Settings.Prop.UpdateChecks is UpdateCheck.Test or UpdateCheck.Both;
+                var updater = new UpdaterManager(includePrerelease);
+
+                // package-manager installs and dev builds aren't Velopack-managed
+                if (!updater.IsInstalled)
+                    return;
+
+                // never restart the app in the middle of a Roblox launch
+                if (LaunchSettings.RobloxLaunchMode != LaunchMode.None)
+                    return;
+
+                var update = await updater.CheckForUpdatesAsync();
+
+                if (update is null)
+                    return;
+
+                await updater.DownloadUpdatesAsync(update);
+                SavePendingUpdateNotes(update);
+                updater.ApplyUpdatesAndRestart(update);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Automatic update check failed");
+            }
+        });
+
+        lock (ActivationLock)
+        {
+            if (LaunchSettings.RobloxLaunchMode == LaunchMode.None && _pendingActivationUri is not null)
+                LaunchSettings.TryResolveRobloxUri([_pendingActivationUri]);
+        }
+
+        await WaitForColdStartActivationAsync();
+
+        lock (ActivationLock)
+            _launchArgsProcessed = true;
+
+        await LaunchHandler.ProcessLaunchArgs();
+        await ShowPendingUpdateNotesAsync();
+
+        base.OnFrameworkInitializationCompleted();
+    }
+
+    private static async Task WaitForColdStartActivationAsync()
+    {
+        if (!OperatingSystem.IsMacOS())
+            return;
+
+        if (LaunchSettings.RobloxLaunchMode != LaunchMode.None
+            || State.Prop.IsFirstLaunch
+            || LaunchSettings.SettingsFlag.Active
+            || BackgroundUpdate.IsCurrentProcess)
+            return;
+
+        Logger.Debug("Waiting for a possible cold-start URL activation");
+
+        _waitStart = DateTime.Now;
+
+        bool signalled = await Task.Run(() => ActivationReceived.Wait(ColdStartActivationTimeout));
+
+        if (LaunchSettings.RobloxLaunchMode != LaunchMode.None)
+            Logger.Debug($"Cold-start activation resolved to {LaunchSettings.RobloxLaunchMode} in {(DateTime.Now - _waitStart).TotalMilliseconds:F0}ms, skipping the launch menu");
+        else if (!signalled)
+            Logger.Debug($"No cold-start activation within {ColdStartActivationTimeout.TotalMilliseconds:F0}ms, opening the launch menu");
+    }
+}

@@ -1,0 +1,10 @@
+[submodule "libs/FluentAvalonia"]
+	path = FluentAvalonia
+	url = https://github.com/Froststrap/FluentAvalonia.git
+[submodule "backend/virtualdisplay"]
+	path = backend/virtualdisplay
+	url = https://github.com/Froststrap/virtualdisplay
+[submodule "backend/modgenerator"]
+	path = backend/modgenerator
+	url = https://github.com/Froststrap/mod-generator.git
+	branch = rust-impl

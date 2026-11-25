@@ -1,0 +1,21 @@
+<!--
+SPDX-FileCopyrightText: 2026 Froststrap
+
+SPDX-License-Identifier: MPL-2.0
+-->
+
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Froststrap.UI.Elements.Controls.StepIndicator">
+    <Border x:Name="Track"
+            Height="4"
+            CornerRadius="2"
+            ClipToBounds="True"
+            Background="{DynamicResource ControlFillColorSecondaryBrush}">
+        <Border x:Name="FillBar"
+                HorizontalAlignment="Left"
+                Width="0"
+                CornerRadius="2"
+                Background="{DynamicResource AccentFillColorDefaultBrush}" />
+    </Border>
+</UserControl>

@@ -1,0 +1,42 @@
+<!--
+SPDX-FileCopyrightText: 2026 Froststrap
+
+SPDX-License-Identifier: MPL-2.0
+-->
+
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="using:Froststrap.UI.Elements.Controls"
+             xmlns:models="using:Froststrap.UI.ViewModels"
+             xmlns:dmodels="using:Froststrap.UI.ViewModels.About"
+             xmlns:resources="using:GhostStrap.Localization"
+             x:DataType="dmodels:LicensesViewModel"
+             x:Class="Froststrap.UI.Elements.About.Pages.LicensesPage">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="14">
+            <TextBlock Margin="0,0,0,4"
+                       FontSize="24"
+                       FontWeight="Bold"
+                       Text="{x:Static resources:Strings.About_Licenses_Title}" />
+
+            <ItemsControl ItemsSource="{Binding Licenses}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <UniformGrid Columns="3" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="dmodels:LicenseItem">
+                        <ui:CardAction Margin="4,2" Icon="Copyright"
+                                       Header="{Binding Header}"
+                                       Description="{Binding Description}"
+                                       Command="{x:Static models:GlobalViewModel.OpenWebpageCommand}"
+                                       CommandParameter="{Binding Url}" />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
