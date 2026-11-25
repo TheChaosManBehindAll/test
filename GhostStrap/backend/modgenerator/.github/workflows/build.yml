@@ -1,0 +1,38 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+          - os: ubuntu-latest
+          - os: macos-latest
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install Rust toolchain
+        uses: moonrepo/setup-rust@v1
+
+      - name: Build CLI
+        run: cargo b -r --timings
+
+      - name: Build library (C ABI)
+        run: cargo b -r --lib --no-default-features --features ffi
+
+      - name: Upload build timings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cargo-timings-${{ matrix.os }}
+          path: target/cargo-timings/
+          if-no-files-found: warn

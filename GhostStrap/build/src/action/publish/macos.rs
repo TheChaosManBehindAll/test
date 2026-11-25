@@ -1,0 +1,189 @@
+// SPDX-FileCopyrightText: 2026 Froststrap
+//
+// SPDX-License-Identifier: MPL-2.0
+
+//! os specific stuff for publish
+
+use crate::{
+    arch,
+    bundle::macos::AppBuilder,
+    path,
+    utils::{log, process},
+};
+use pissing::prelude::*;
+use std::{fs, path::PathBuf};
+
+fn find_dylib(file_name: &str) -> PathBuf {
+    let profile = "release";
+    let triple = arch::rust_triple();
+    let p = path::git_root()
+        .join("backend/target")
+        .join(triple)
+        .join(profile)
+        .join(file_name);
+
+    if !p.is_file() {
+        log::error!(
+            "{} not found - did `cargo build` run for the {} profile on {}?",
+            p.display(),
+            profile,
+            triple
+        );
+        std::process::exit(1);
+    }
+    p
+}
+
+fn cf_bundle_version(version: &str) -> String {
+    version
+        .split(|c: char| !c.is_ascii_digit())
+        .filter(|part| !part.is_empty())
+        .take(4)
+        .collect::<Vec<_>>()
+        .join(".")
+}
+
+fn info_plist(version: &str) -> PListFile {
+    PListFile::new("1.0").content(dict![
+        string("CFBundleDevelopmentRegion", "en"),
+        string("CFBundleExecutable", "GhostStrap"),
+        string("CFBundleIdentifier", "com.ghoststrap.desktop"),
+        string("CFBundleName", "GhostStrap"),
+        string("CFBundleDisplayName", "GhostStrap"),
+        string("CFBundlePackageType", "APPL"),
+        string("CFBundleInfoDictionaryVersion", "6.0"),
+        string("CFBundleIconFile", "AppIcon"),
+        string("CFBundleIconName", "AppIcon"),
+        string("CFBundleShortVersionString", version),
+        string("CFBundleVersion", cf_bundle_version(version)),
+        string("LSMinimumSystemVersion", "12.0"),
+        string("LSApplicationCategoryType", "public.app-category.utilities"),
+        entry("CFBundleSupportedPlatforms", array!["MacOSX"]),
+        array(
+            "CFBundleURLTypes",
+            [dict![
+                string("CFBundleURLName", "com.ghoststrap.roblox"),
+                string("CFBundleTypeRole", "Viewer"),
+                entry(
+                    "CFBundleURLSchemes",
+                    array![
+                        "roblox",
+                        "roblox-player",
+                        "roblox-studio",
+                        "roblox-studio-auth",
+                    ]
+                ),
+            ]]
+        ),
+        array(
+            "UTExportedTypeDeclarations",
+            [
+                dict![
+                    string("UTTypeIdentifier", "com.ghoststrap.roblox.place"),
+                    string("UTTypeDescription", "Roblox Place"),
+                    entry("UTTypeConformsTo", array!["public.data"]),
+                    dict(
+                        "UTTypeTagSpecification",
+                        [entry("public.filename-extension", array!["rbxl", "rbxlx"]),]
+                    ),
+                ],
+                dict![
+                    string("UTTypeIdentifier", "com.ghoststrap.roblox.model"),
+                    string("UTTypeDescription", "Roblox Model"),
+                    entry("UTTypeConformsTo", array!["public.data"]),
+                    dict(
+                        "UTTypeTagSpecification",
+                        [entry("public.filename-extension", array!["rbxm", "rbxmx"]),]
+                    ),
+                ],
+            ]
+        ),
+        array(
+            "CFBundleDocumentTypes",
+            [
+                dict![
+                    string("CFBundleTypeName", "Roblox Place"),
+                    string("CFBundleTypeRole", "Viewer"),
+                    entry("LSItemContentTypes", array!["com.ghoststrap.roblox.place"]),
+                ],
+                dict![
+                    string("CFBundleTypeName", "Roblox Model"),
+                    string("CFBundleTypeRole", "Viewer"),
+                    entry("LSItemContentTypes", array!["com.ghoststrap.roblox.model"]),
+                ],
+            ]
+        ),
+    ])
+}
+
+fn entitlements() -> PListFile {
+    PListFile::new("1.0").content(dict![
+        bool("com.apple.security.files.user-selected.read-write", true),
+        bool("com.apple.security.files.downloads.read-write", false),
+        bool("com.apple.security.network.client", true),
+    ])
+}
+
+fn thin_bin(path: PathBuf) -> PathBuf {
+    let arch = arch::apple_arch();
+    let path = path.to_str().unwrap();
+
+    log::info!("Thinning binary {} to only {} via lipo", path, arch);
+
+    let args = ["-thin", arch, path, "-output", path];
+
+    _ = process("lipo", args).exec();
+    path.into()
+}
+
+fn strip_bin(path: PathBuf) -> PathBuf {
+    let p = path.to_str().unwrap();
+
+    log::info!("Stripping local symbols from {}", p);
+    process("strip", ["-x", p]).exec_checked("strip");
+    process("codesign", ["--force", "--sign", "-", p]).exec_checked("codesign");
+    path
+}
+
+pub fn main() -> (PathBuf, PathBuf) {
+    let version = super::version();
+
+    let publish_dir = path::dotnet_publish_artifacts();
+    let dist = path::dist();
+    fs::create_dir_all(&dist).unwrap();
+
+    let main_executable = publish_dir.join("GhostStrap");
+    let icon_path = path::git_root().join("GhostStrap/Resources/IconGhostStrap.png");
+
+    let entitlements_path = path::bundling_artifacts().join("GhostStrap.entitlements");
+    fs::create_dir_all(path::bundling_artifacts()).expect("Failed to create bundling directory");
+    entitlements()
+        .write(&entitlements_path)
+        .expect("Failed to write GhostStrap.entitlements");
+
+    let mut builder = AppBuilder::new("GhostStrap")
+        .info_plist(info_plist(&version))
+        .app_icon(icon_path)
+        .binary(&main_executable);
+
+    for lib in [
+        "libvirtualdisplay.dylib",
+        "libmobileappreg.dylib",
+        "libnotify.dylib",
+        "libmod_generator.dylib",
+    ] {
+        let dylib = find_dylib(lib);
+        builder = builder.framework(dylib);
+    }
+
+    for lib in [
+        "libAvaloniaNative.dylib",
+        "libSkiaSharp.dylib",
+        "libHarfBuzzSharp.dylib",
+    ] {
+        let dylib = strip_bin(thin_bin(publish_dir.join(lib)));
+        builder = builder.framework(dylib);
+    }
+
+    (builder.build(&dist), entitlements_path)
+}

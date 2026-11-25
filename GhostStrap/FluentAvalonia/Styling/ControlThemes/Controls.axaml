@@ -1,0 +1,75 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="using:FluentAvalonia.UI.Controls">
+    <Styles.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/DataValidationErrorsStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/WindowStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/ButtonStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/ToggleButtonStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/AutoCompleteBoxStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/TextBlockStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/TextBoxStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/ScrollBarStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/ScrollViewerStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/EmbeddableControlRootStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/LabelStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/ItemsControlStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/OverlayPopupHostStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/PopupRootStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/ToolTipStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/WindowNotificationManagerStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/ContentControlStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/ButtonSpinnerStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/RepeatButtonStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/GridSplitterStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/ComboBoxStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/DropDownButtonStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/CaptionButtonStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/CheckBoxStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/ListBoxStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/MenuStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/MenuItemStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/NotificationCardStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/ProgressBarStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/RadioButtonStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/SliderStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/SplitViewStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/TabControlStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/TabStripStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/ToggleSwitchStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/NumericUpDownStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/ExpanderStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/ManagedFileChooserStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/FlyoutPresenterStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/TitleBarStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/TransitioningContentControlStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/ColorPicker/ColorPickerStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/PathIcon.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/HyperlinkButtonStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/FocusAdornerStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/TextSelectionHandleStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/BasicControls/WindowDecorations.axaml" />
+
+                <!-- FluentAvalonia Controls -->
+                <MergeResourceInclude Source="/Styling/ControlThemes/FAControls/InfoBadgeStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/FAControls/InfoBarStyles.axaml" />
+
+                <MergeResourceInclude Source="/Styling/ControlThemes/FAControls/NavigationView/NavigationViewSharedStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/FAControls/NavigationView/NavigationViewBackButtonStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/FAControls/NavigationView/NavigationViewItemHeaderStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/FAControls/NavigationView/NavigationViewItemSeparatorStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/FAControls/NavigationView/NavigationViewItemPresenterStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/FAControls/NavigationView/NavigationViewItemStyles.axaml" />
+                <MergeResourceInclude Source="/Styling/ControlThemes/FAControls/NavigationView/NavigationViewStyles.axaml" />
+
+                <MergeResourceInclude Source="/Styling/ControlThemes/FAControls/ProgressRingStyles.axaml" />
+
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Styles.Resources>
+
+    <StyleInclude Source="/Styling/ControlThemes/BasicControls/UserControlStyles.axaml" />
+
+</Styles>

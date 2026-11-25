@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  managed-build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '**/*.props', '**/*.targets') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Build managed solution
+        shell: pwsh
+        run: >-
+          dotnet build GhostStrap.slnx -c Release -p:SkipNativeBackend=true
+
+      - name: Run available test projects
+        shell: pwsh
+        run: |
+          $testProjects = Get-ChildItem -Path . -Filter '*Tests.csproj' -Recurse -File
+          if ($testProjects.Count -eq 0) {
+            Write-Host 'No test projects are present yet.'
+            exit 0
+          }
+          foreach ($project in $testProjects) {
+            dotnet test $project.FullName -c Release --no-build `
+              --logger "trx;LogFileName=ghoststrap-${{ runner.os }}.trx" `
+              --results-directory TestResults
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-${{ runner.os }}-${{ github.sha }}
+          path: TestResults/**/*.trx
+          if-no-files-found: warn
