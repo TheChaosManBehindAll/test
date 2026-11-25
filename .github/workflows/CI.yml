@@ -38,7 +38,7 @@ jobs:
       - name: Build managed solution
         shell: pwsh
         run: >-
-          dotnet build GhostStrap.slnx -c Release -p:SkipNativeBackend=true
+          dotnet build GhostStrap/GhostStrap.slnx -c Release -p:SkipNativeBackend=true
 
       - name: Run available test projects
         shell: pwsh

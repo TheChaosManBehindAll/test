@@ -33,7 +33,7 @@ fn version() -> String {
 }
 
 fn version_for_run() -> String {
-    let csproj = path::git_root().join("GhostStrap/GhostStrap.csproj");
+    let csproj = path::git_root().join("GhostStrap/GhostStrap/GhostStrap.csproj");
     let contents = fs::read_to_string(&csproj).expect("failed to read GhostStrap.csproj");
 
     let version = contents
@@ -60,7 +60,7 @@ pub fn main() {
     let a = args::get();
 
     let path: String = path::git_root()
-        .join("GhostStrap/GhostStrap.csproj")
+        .join("GhostStrap/GhostStrap/GhostStrap.csproj")
         .into_string()
         .unwrap();
     log::info!("Froststrap path: {}", path);

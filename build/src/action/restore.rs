@@ -11,7 +11,7 @@ pub fn main() {
 
     let args = [
         "restore",
-        "./GhostStrap/GhostStrap.csproj"
+        "./GhostStrap/GhostStrap/GhostStrap.csproj"
     ];
 
     process("dotnet", args).exec_checked("dotnet restore");
