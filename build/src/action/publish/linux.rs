@@ -18,7 +18,7 @@ use std::{
 
 pub fn main() {
     let version = super::version();
-    let icon = path::git_root().join("GhostStrap/Resources/IconGhostStrap.png");
+    let icon = path::git_root().join("GhostStrap/GhostStrap/Resources/IconGhostStrap.png");
     let desktop = path::dist().join("ghoststrap.desktop");
 
     std::fs::create_dir_all(path::dist()).unwrap();
@@ -248,3 +248,4 @@ pub fn is_on_path(exe: &str) -> bool {
         .filter(|dir| !dir.as_os_str().is_empty())
         .any(|dir| dir.join(exe).exists())
 }
+
